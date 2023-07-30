@@ -73,7 +73,7 @@ install_pyenv()
     local pyenv_str=$(grep "pyenv" ${shell_rc})
     local pydir="${HOME}/.pyenv"
     local pydir_virtual="${HOME}/.pyenv/plugins/pyenv-virtualenv"
-    LOG_INFO "clone and init pyenv to install python 3.7.3 !"
+    LOG_INFO "clone and init pyenv to install python 3.9.0 !"
     # clone pyenv
     if [ ! -d "${pydir}" ];then
         execute_cmd "git clone https://github.com/pyenv/pyenv.git ~/.pyenv"
@@ -97,7 +97,7 @@ install_pyenv()
 
 install_python3()
 {
-    version=3.7.3
+    version="3.9.0"
 	python_versions=$(pyenv versions | grep "${version}")
 	if [ -z "${python_versions}" ];then
         execute_cmd "wget https://www.python.org/ftp/python/$version/Python-$version.tar.xz -P ~/.pyenv/cache/ && pyenv install $version"
