@@ -46,6 +46,14 @@ ROLE_AGG = "agg"  # 聚合节点
 # 轮询的时间间隔，单位秒
 QUERY_INTERVAL = 5
 
+# 智能合约接口
+REGISTER_NODE = "RegisterNode"  # 注册节点
+UPLOAD_LOCAL_PROTOS = "UploadLocalProtos"  # 上传本地protos
+UPDATE_GLOBAL_PROTOS = "UpdateGlobalProtos"  # 更新全局protos
+QUERY_GLOBAL_PROTOS = "QueryGlobalProtos"  # 查询全局protos
+QUERY_PROTOS_UPDATES = "QueryProtosUpdates"  # 查询protos更新
+QUERY_CURRENT_EPOCH = "QueryCurrentEpoch"  # 查询当前轮次
+
 # 从文件加载abi定义
 if os.path.isfile(client_config.solc_path) or os.path.isfile(client_config.solcjs_path):
     Compiler.compile_file("contracts/CBHFLPrecompiled.sol")
@@ -82,7 +90,7 @@ def run_one_node(node_id, args, role, train_dataset, local_model, user_data):
     def local_training(global_epoch):
         print(f"{node_id} begin training, global epoch: {global_epoch}")
         try:
-            global_protos, epoch = client.call(to_address, contract_abi, "QueryGlobalProtos")
+            global_protos, epoch = client.call(to_address, contract_abi, QUERY_GLOBAL_PROTOS)
             if global_protos == "":
                 global_protos = []
             else:
@@ -100,7 +108,7 @@ def run_one_node(node_id, args, role, train_dataset, local_model, user_data):
                 local_protos[k] = local_protos[k].tolist()
             proto_str = serialize(local_protos)
             client.sendRawTransactionGetReceipt(
-                to_address, contract_abi, "UploadLocalProtos", [proto_str, epoch])
+                to_address, contract_abi, UPLOAD_LOCAL_PROTOS, [proto_str, epoch])
 
             local_model.load_state_dict(w, strict=True)
 
@@ -116,7 +124,7 @@ def run_one_node(node_id, args, role, train_dataset, local_model, user_data):
     def local_aggregating():
         print(f"{node_id} begin aggregating..")
         try:
-            updates, = client.call(to_address, contract_abi, "QueryProtosUpdates")
+            updates, = client.call(to_address, contract_abi, QUERY_PROTOS_UPDATES)
             updates = deserialize(updates)
 
             # 如果更新的节点数不够，就不进行聚合
@@ -127,9 +135,9 @@ def run_one_node(node_id, args, role, train_dataset, local_model, user_data):
             update_protos = [torch.tensor(protos) for _, protos in updates.items()]
             global_protos = proto_aggregation(update_protos)
 
-            _, epoch = client.call(to_address, contract_abi, "QueryCurrentEpoch")
+            epoch = client.call(to_address, contract_abi, QUERY_CURRENT_EPOCH)
             client.sendRawTransactionGetReceipt(
-                to_address, contract_abi, "UpdateGlobalProtos", [global_protos, epoch])
+                to_address, contract_abi, UPDATE_GLOBAL_PROTOS, [global_protos, epoch])
 
             nonlocal trained_epoch
             trained_epoch = epoch
@@ -148,11 +156,11 @@ def run_one_node(node_id, args, role, train_dataset, local_model, user_data):
         # 注册节点
         try:
             client.sendRawTransactionGetReceipt(
-                to_address, contract_abi, "RegisterNode", [role])
+                to_address, contract_abi, REGISTER_NODE, [role])
             print("{} registered successfully".format(node_id))
 
             while True:
-                global_epoch, = client.call(to_address, contract_abi, "QueryCurrentEpoch")
+                global_epoch, = client.call(to_address, contract_abi, QUERY_CURRENT_EPOCH)
 
                 if global_epoch > args.rounds:
                     break
@@ -169,7 +177,7 @@ def run_one_node(node_id, args, role, train_dataset, local_model, user_data):
 
                 wait()
 
-        except Exception as e:
+        except Exception as _:
             client.finish()
             traceback.print_exc()
 
